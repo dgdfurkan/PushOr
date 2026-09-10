@@ -1,18 +1,22 @@
 // Gün Akışı companion scheduler. Deploy the scheduler directory with Workers Builds.
 // The connection key belongs in Settings → Variables and Secrets, never here.
 const DEFAULT_SITE_ORIGIN = 'https://gun-akisi.gunduz.chatgpt.site';
-const VERSION = '2026-09-10.2';
+const VERSION = '2026-09-10.3';
 
-function config(env) {
-  const secret = String(env.CRON_SECRET || '').trim();
-  if (secret.length < 32) throw new Error('CRON_SECRET eksik. Settings → Variables and Secrets bölümünden Secret olarak ekle.');
+function siteOrigin(env) {
   const raw = String(env.SITE_ORIGIN || DEFAULT_SITE_ORIGIN).trim().replace(/\/+$/, '');
   let url;
   try { url = new URL(raw); } catch { throw new Error('SITE_ORIGIN geçerli bir site adresi değil.'); }
   if (url.protocol !== 'https:' || url.origin !== raw || url.username || url.password) {
     throw new Error('SITE_ORIGIN yalnızca https:// ile başlayan ana site adresi olmalı; sonuna /api/tick ekleme.');
   }
-  return { secret, origin: url.origin };
+  return url.origin;
+}
+
+function config(env) {
+  const secret = String(env.CRON_SECRET || '').trim();
+  if (secret.length < 32) throw new Error('CRON_SECRET eksik. Settings → Variables and Secrets bölümünden Secret olarak ekle.');
+  return { secret, origin: siteOrigin(env) };
 }
 
 async function digest(value) {
@@ -58,11 +62,11 @@ function json(value, status = 200) {
   return Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 }
 
-function setupPage() {
+function setupPage(origin) {
   const nonce = crypto.randomUUID().replaceAll('-', '');
   return new Response(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gün Akışı · Bağlantı kontrolü</title><style>
   *{box-sizing:border-box}body{font:16px/1.65 system-ui;margin:0;padding:32px 20px;background:#f6f7f9;color:#302a3b}main{max-width:470px;margin:8vh auto;background:#fff;border:1px solid #e6e0eb;padding:28px;border-radius:22px}h1{font-size:26px;line-height:1.3;letter-spacing:-.6px}p{color:#74697e}label{display:block;margin-top:25px}input,button{width:100%;font:inherit;border-radius:12px;padding:12px 14px}input{border:1px solid #dcd5e5;margin:8px 0 15px}button{border:0;color:white;background:#6540ca;cursor:pointer}button:disabled{opacity:.55}output{display:block;margin-top:22px;white-space:pre-line}small{display:block;font-size:13px;color:#8c7b98;margin-top:17px}a{color:#6540ca}
-  </style></head><body><main><h1>Bağlantıyı kontrol edelim.</h1><p>Bu, bildirim servisinin kurulum ekranı. Günlük planın için <a href="${DEFAULT_SITE_ORIGIN}">Gün Akışı uygulamasını aç</a>.</p><p>Cloudflare’a kaydettiğin bağlantı anahtarını gir. Anahtar bu ekranda saklanmaz.</p><form id="test"><label for="secret">Bağlantı anahtarı</label><input id="secret" name="secret" type="password" autocomplete="off" spellcheck="false" required minlength="32"><button id="send">Bağlantıyı dene</button></form><output id="result" aria-live="polite"></output><small>Zamanı gelmiş bildirimler varsa bu test onları da gönderir. Bu testin başarılı olması, dakikalık zamanlamanın kurulduğu anlamına gelmez.</small><p><a href="${DEFAULT_SITE_ORIGIN}/?view=settings">Gün Akışı ayarlarını aç</a></p></main><script nonce="${nonce}">
+  </style></head><body><main><h1>Bağlantıyı kontrol edelim.</h1><p>Bu, bildirim servisinin kurulum ekranı. Günlük planın için <a href="${origin}">Gün Akışı uygulamasını aç</a>.</p><p>Cloudflare’a kaydettiğin bağlantı anahtarını gir. Anahtar bu ekranda saklanmaz.</p><form id="test"><label for="secret">Bağlantı anahtarı</label><input id="secret" name="secret" type="password" autocomplete="off" spellcheck="false" required minlength="32"><button id="send">Bağlantıyı dene</button></form><output id="result" aria-live="polite"></output><small>Zamanı gelmiş bildirimler varsa bu test onları da gönderir. Bu testin başarılı olması, dakikalık zamanlamanın kurulduğu anlamına gelmez.</small><p><a href="${origin}/?view=settings">Gün Akışı ayarlarını aç</a></p></main><script nonce="${nonce}">
   document.getElementById('test').addEventListener('submit',async event=>{
     event.preventDefault();const field=document.getElementById('secret'),button=document.getElementById('send'),result=document.getElementById('result');let key=field.value.trim();field.value='';button.disabled=true;result.textContent='Bağlantı deneniyor…';
     try{const response=await fetch('/run',{method:'POST',headers:{Authorization:'Bearer '+key},redirect:'error'});key='';const data=await response.json();if(!response.ok)throw Error(data.error||'Bağlantı kurulamadı.');result.textContent='Bağlantı tamam. '+data.sent+' bildirim gönderildi.\\nGün Akışı, ilk otomatik çalışmadan sonra zamanlayıcıyı etkin gösterecek. Yeni zamanlamanın devreye girmesi 15 dakikayı bulabilir.';}
@@ -84,7 +88,18 @@ export default {
   },
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
-    if (request.method === 'GET' && path === '/') return setupPage();
+    // Opening the Worker is a normal app visit; diagnostics are opt-in at /setup.
+    if ((request.method === 'GET' || request.method === 'HEAD') && path === '/') {
+      try {
+        return new Response(null, { status: 302, headers: {
+          Location: siteOrigin(env) + '/', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+        } });
+      } catch (error) { return json({ error: error.message }, 503); }
+    }
+    if (request.method === 'GET' && path === '/setup') {
+      try { return setupPage(siteOrigin(env)); }
+      catch (error) { return json({ error: error.message }, 503); }
+    }
     if (request.method === 'GET' && (path === '/health' || path === '/api/health')) {
       try { config(env); return json({ version: VERSION, configured: true, note: 'Bu yalnızca ayar kontrolüdür; otomatik çalışmayı doğrulamaz.' }); }
       catch (error) { return json({ version: VERSION, configured: false, error: error.message }, 503); }

@@ -16,11 +16,22 @@ globalThis.fetch = async (url, options) => {
   calls.push({ url, options }); return response();
 };
 try {
-  const page = await worker.fetch(request('/'), env);
+  const visit = await worker.fetch(request('/'), env);
+  assert.equal(visit.status, 302);
+  assert.equal(visit.headers.get('location'), 'https://gun-akisi.gunduz.chatgpt.site/');
+  assert.equal(visit.headers.get('cache-control'), 'no-store');
+  assert.equal(await visit.text(), '');
+  assert.equal((await worker.fetch(request('/'), {})).status, 302, 'App visits must not require a connection key');
+  const custom = { ...env, SITE_ORIGIN: 'https://custom.example/' };
+  assert.equal((await worker.fetch(request('/', 'HEAD'), custom)).headers.get('location'), 'https://custom.example/');
+  assert.equal((await worker.fetch(request('/?redirect=https://other.example&secret=not-forwarded'), env)).headers.get('location'), 'https://gun-akisi.gunduz.chatgpt.site/');
+  assert.equal((await worker.fetch(request('/'), { ...env, SITE_ORIGIN: 'javascript:alert(1)' })).status, 503);
+  const page = await worker.fetch(request('/setup'), custom);
   const html = await page.text();
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert(!html.includes(secret));
+  assert(html.includes('href="https://custom.example"'));
   // Validate the actual inline JS, including the newline inside the template literal.
   const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
   new Function(script);

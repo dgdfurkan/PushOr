@@ -13,7 +13,7 @@ Bu klasördeki küçük program dakikada bir uygulamaya haber verir; zamanı gel
 3. Üstteki **Deployments** sekmesine geç. Sayfanın altına inip **View Build History** (derleme geçmişi) bağlantısına tıkla.
 4. `main` dalındaki en güncel kaydı bul. Commit kodunu [GitHub commit listesiyle](https://github.com/dgdfurkan/PushOr/commits/main/) karşılaştır. Yeni sürüm daha ilerideyse `db402775` kodunu aramana gerek yok; düzeltmeyi o da içerir.
 5. O kaydın yanındaki **⋯** menüsüne bas, **Retry build** seç. Aynı düğme kaydın detay sayfasında da bulunur. Eski bir kaydı tekrar denemek yeni commit'i seçmez; güncel kaydı kullandığından emin ol.
-6. Derleme ve dağıtımın başarılı olmasını bekle. [Sağlık kontrolünü aç](https://gun-akisi-scheduler.frkngndz60.workers.dev/api/health): yanıtta `version: "2026-09-10.2"` görünmeli. `{"error":"Bulunamadı."}` eski kodun hâlâ yayında olduğunu gösterir.
+6. Derleme ve dağıtımın başarılı olmasını bekle. [Sağlık kontrolünü aç](https://gun-akisi-scheduler.frkngndz60.workers.dev/api/health): yanıtta `version: "2026-09-10.3"` görünmeli. `{"error":"Bulunamadı."}` eski kodun hâlâ yayında olduğunu gösterir.
 7. [Gün Akışı ayarlarını](https://gun-akisi.gunduz.chatgpt.site/?view=settings) aç. **Zamanlayıcı çalışıyor** durumu gerçek dakikalık çalışmayı doğrular. Sağlık sayfasındaki `configured: true` tek başına bunu doğrulamaz.
 
 Güncel commit derleme geçmişinde hiç yoksa **Settings → Build** içinde GitHub bağlantısı, `PushOr` deposu, `main` dalı ve otomatik derleme ayarlarını kontrol et. GitHub'a yeni commit geldiğinde bağlı dal için derleme otomatik başlar. Bir hata olursa derleme detayının en altındaki hata metni teşhis için gereklidir.
@@ -65,9 +65,9 @@ Oluşan **gun-akisi-scheduler** uygulamasını aç. **Settings → Variables and
 
 ## 4. Bağlantıyı dene
 
-Günlük kullanacağın PWA adresi **https://gun-akisi.gunduz.chatgpt.site**. Cloudflare’ın `workers.dev` adresi bildirim servisinin bağlantı kontrol ekranıdır; bu ekranın açılması beklenen davranıştır. Sağlık kontrolü için Worker adresinin sonuna `/health` veya `/api/health` ekleyebilirsin. `configured: true` anahtar/adres ayarlarının bulunduğunu gösterir; anahtarın eşleştiğini veya cron çalıştığını kanıtlamaz.
+Günlük kullanacağın PWA adresi **https://gun-akisi.gunduz.chatgpt.site**. Cloudflare’ın `workers.dev` ana adresi doğrudan Gün Akışı uygulamasına yönlendirir. Bağlantı kontrol ekranına yalnız Worker adresinin sonuna `/setup` ekleyerek ulaşılır; günlük kullanımda anahtar sorulmaz. Sağlık kontrolü için Worker adresinin sonuna `/health` veya `/api/health` ekleyebilirsin. `configured: true` anahtar/adres ayarlarının bulunduğunu gösterir; anahtarın eşleştiğini veya cron çalıştığını kanıtlamaz.
 
-Worker ekranındaki **Visit** bağlantısını veya gösterilen `workers.dev` adresini aç. “Bağlantıyı kontrol edelim” ekranı gelecek.
+[Bildirim servisinin bağlantı kontrolünü aç](https://gun-akisi-scheduler.frkngndz60.workers.dev/setup). “Bağlantıyı kontrol edelim” ekranı yalnız bu `/setup` adresinde gösterilir. **Visit** düğmesi artık doğrudan Gün Akışı uygulamasını açar.
 
 Az önce kullandığın anahtarı **Bağlantı anahtarı** alanına yapıştır ve **Bağlantıyı dene** düğmesine bas. **“Bağlantı tamam”** mesajı görmelisin. `0 bildirim gönderildi` normaldir: o anda zamanı gelmiş bildirim olmayabilir.
 
@@ -110,6 +110,6 @@ Test bildirimi geliyor ama mola bitişi gelmiyorsa önce 5. adımdaki zamanlayı
 
 ## Başka bir uygulama adresinde kullanacak geliştirici için
 
-Mevcut Gün Akışı kurulumu için bu bölümde işlem yapılmaz. Kendi kopyanı yayımlarsan en az 32 bayt rastgele anahtarı ana uygulamanın runtime'ına `CRON_SECRET` olarak ekle ve siteyi yeniden yayımla. Aynı anahtarı companion Worker'a Secret olarak ver. `wrangler.jsonc` içindeki `SITE_ORIGIN` ile ana uygulamanın `SITE_ORIGIN` değerini yeni HTTPS origin'e ayarla; sonuna `/api/tick` ekleme. Kurulum sayfasındaki uygulama bağlantısı için `worker.js` içindeki varsayılan adresi de değiştir.
+Mevcut Gün Akışı kurulumu için bu bölümde işlem yapılmaz. Kendi kopyanı yayımlarsan en az 32 bayt rastgele anahtarı ana uygulamanın runtime'ına `CRON_SECRET` olarak ekle ve siteyi yeniden yayımla. Aynı anahtarı companion Worker'a Secret olarak ver. `wrangler.jsonc` içindeki `SITE_ORIGIN` ile ana uygulamanın `SITE_ORIGIN` değerini yeni HTTPS origin'e ayarla; sonuna `/api/tick` ekleme. Ana adresteki yönlendirme ve kurulum sayfasının bağlantıları aynı `SITE_ORIGIN` değerini kullanır.
 
 Alternatif zamanlayıcı `POST /api/tick` çağrısını `Authorization: Bearer <CRON_SECRET>` ve `X-Gun-Akisi-Trigger: cron` başlıklarıyla yapmalı. Elle yapılan bağlantı testleri `manual` kullanır; otomatik çalışmanın sağlık kaydını güncellemez. Anahtar yokken API gönderimi kapalı tutar. Bağlantı sayfası anahtarı saklamaz; Worker logları anahtarı yazmaz.
