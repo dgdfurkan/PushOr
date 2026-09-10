@@ -20,6 +20,8 @@ export function at(date:string,time:string) {return Date.parse(`${date}T${time}:
 export function clock(ms:number) {return new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit'}).format(new Date(ms));}
 export function addDays(date:string,n:number) {return new Date(at(date,'12:00')+n*86400000).toISOString().slice(0,10);}
 export function humanMinutes(n:number) {return n>=60 ? `${Math.floor(n/60)} sa${Math.round(n%60)?' '+Math.round(n%60)+' dk':''}` : `${Math.round(n)} dk`;}
+export function countdown(ms:number){const seconds=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(seconds/3600)).padStart(2,'0')} saat ${String(Math.floor(seconds%3600/60)).padStart(2,'0')} dakika ${String(seconds%60).padStart(2,'0')} saniye`;}
+export function nextPrayer(days:PrayerDay[],now:number){return days.flatMap(p=>([['Sabah',p.imsak],['Öğle',p.noon],['İkindi',p.afternoon],['Akşam',p.sunset],['Yatsı',p.night]] as const).map(([name,time])=>({name,at:at(p.date,time)}))).filter(p=>p.at>now).sort((a,b)=>a.at-b.at)[0];}
 export const recipes=[
  {title:'Kekikli yumurta tabağı',need:['Yumurta','Peynir','Domates'],detail:'Yumurta, peynir ve domates. Kekik, biraz zeytinyağı; varsa tam tahıllı ekmek.'},
  {title:'Peynirli domatesli tost',need:['Peynir','Domates','Ekmek'],detail:'Ekmeğe peynir ve domates ekle, tavada ısıt. Yanına su ve birkaç zeytin.'},
@@ -53,7 +55,7 @@ export function buildPlan(p:PrayerDay,s:Settings):PlanEvent[] {
  add('recovery-end',si.end,'sun','Güne devam','Uyku bloğun sona erdi. İyi hissediyorsan biraz gün ışığı ve hafif hareket.',true,10);
  }
  for(const [key,label,t] of [['noon','Öğle',noon],['asr','İkindi',asr],['sunset','Akşam',at(d,p.sunset)],['night','Yatsı',night]] as const){
- add(key+'-before',t-5*minute,'prayer',`${label} vaktine 5 dakika`,`Hazırlanmak için kısa bir ara ver. Vakit ${clock(t)}.`,true,5);
+ add(key+'-before',t-5*minute,'prayer',`${label} namazına hazırlık`,`Hazırlanmak için kısa bir ara ver. Vakit ${clock(t)}.`,true,5);
  add(key,t,'prayer',`${label} vakti`,`${label} namazı vakti girdi.`,true,10);
  }
  if(!s.skippedNaps.includes(d))add('nap',noon+20*minute,'nap','20 dakika dinlenebilirsin','Öğle namazından sonra kısa bir şekerleme. Başlatınca süreni takip edeceğim.',true,40,'activity');

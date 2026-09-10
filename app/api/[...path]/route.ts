@@ -3,12 +3,14 @@ import {cities,districts,districtChoices,prayerDays} from '../../../server/praye
 import {identify,createDevice,state,parseSettings,ensureDistrict,schedule,restoreActive,vapid,startSession,modifySession,dispatch,hash,type Device} from '../../../server/service';
 import {validateSettings,defaults} from '../../../lib/model';
 import {sendPush,validateSubscription} from '../../../server/push';
+import {listReminders,saveReminder,deleteReminder,restoreReminders,uploadMedia,getMedia,removeMedia} from '../../../server/reminders';
 const json=(value:unknown,status=200,headers:Record<string,string>={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...headers}});
 async function body(req:Request){if(Number(req.headers.get('content-length')||0)>12000)throw Error('İstek çok büyük.');const text=await req.text();if(text.length>12000)throw Error('İstek çok büyük.');return JSON.parse(text||'{}');}
 async function handler(req:Request){
  try{
  const url=new URL(req.url),path=url.pathname.replace(/^\/api\//,'');
  if(path==='health')return json({ok:true});
+ if(path.startsWith('reminder-media/')&&(req.method==='GET'||req.method==='HEAD'))return await getMedia(req,path.slice('reminder-media/'.length));
  if(path==='tick'){
  if(req.method!=='POST')return json({error:'POST gerekli.'},405);
  const secret=runtime().CRON_SECRET;if(!secret)return json({error:'Zamanlayıcı henüz bağlı değil.'},503);
@@ -33,8 +35,13 @@ async function handler(req:Request){
  }
  if(!d)return json({error:'Bağlantın yenilenmeli. Sayfayı yenile.'},401);
  if(path==='state'&&req.method==='GET')return json(await state(d));
+ if(path==='reminders'&&req.method==='GET')return json({reminders:await listReminders(d),now:Date.now()});
  if(req.method!=='POST')return json({error:'Bulunamadı.'},404);
+ if(path==='reminder-media')return json(await uploadMedia(d,req));
  const input=await body(req);
+ if(path==='reminders'){await saveReminder(d,input);return json({reminders:await listReminders(d),now:Date.now()});}
+ if(path==='reminders/delete'){await deleteReminder(d,input.id);return json({reminders:await listReminders(d),now:Date.now()});}
+ if(path==='reminder-media/delete'){await removeMedia(d,input.id);return json({ok:true});}
  if(path==='settings'){
  const old=parseSettings(d),s=validateSettings(input.settings,old);
  if(input.revision!==d.revision)return json({error:'Ayarlar başka bir ekranda değişmiş. Yenileyip tekrar dene.'},409);
@@ -58,10 +65,11 @@ async function handler(req:Request){
  d=(await db().prepare('SELECT * FROM devices WHERE id=?').bind(d.id).first<Device>())!;
  await db().prepare("UPDATE events SET status='cancelled' WHERE device=? AND status IN ('pending','sending') AND (group_id='plan' OR ?=0)").bind(d.id,s.reminders?1:0).run();
  let warning='';try{await schedule(d);await restoreActive(d);}catch{warning='Ayarlar kaydedildi. Vakit servisine ulaşılamadığı için yeni bildirim planı henüz hazırlanamadı.';}
+ await restoreReminders(d);
  return json({...await state(d),warning});
  }
  if(path==='subscribe'){
- const subscription=validateSubscription(input.subscription);await db().prepare('UPDATE devices SET subscription=?,updated=? WHERE id=?').bind(JSON.stringify(subscription),Date.now(),d.id).run();d={...d,subscription:JSON.stringify(subscription)};let warning='';try{await schedule(d);await restoreActive(d);}catch{warning='Bildirim izni kaydedildi; namaz vakitleri alınamadığı için plan henüz oluşturulamadı.';}return json({...await state(d),warning});
+ const subscription=validateSubscription(input.subscription);await db().prepare('UPDATE devices SET subscription=?,updated=? WHERE id=?').bind(JSON.stringify(subscription),Date.now(),d.id).run();d={...d,subscription:JSON.stringify(subscription)};await restoreReminders(d);let warning='';try{await schedule(d);await restoreActive(d);}catch{warning='Bildirim izni kaydedildi; namaz vakitleri alınamadığı için plan henüz oluşturulamadı.';}return json({...await state(d),warning});
  }
  if(path==='unsubscribe'){
  await db().batch([db().prepare('UPDATE devices SET subscription=NULL WHERE id=?').bind(d.id),db().prepare("UPDATE events SET status='cancelled' WHERE device=? AND status IN ('pending','sending')").bind(d.id)]);return json({ok:true});
@@ -81,4 +89,4 @@ async function handler(req:Request){
  return json({error:'Bulunamadı.'},404);
  }catch(e){console.error('Gün Akışı request failed',e instanceof Error?e.message:'Unknown');const msg=e instanceof Error?e.message:'';return json({error:/D1|SQLITE|fetch|timeout|JSON|network/i.test(msg)?'Servise şu an ulaşılamıyor. Birazdan yeniden dene.':msg||'İşlem tamamlanamadı.'},400);}
 }
-export const GET=handler;export const POST=handler;
+export const GET=handler;export const POST=handler;export const HEAD=handler;

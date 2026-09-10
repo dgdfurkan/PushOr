@@ -1,6 +1,7 @@
 import {db,kvGet,kvSet,runtime} from './db';
 import {generateVapid,sendPush,validateSubscription,b64} from './push';
 import {defaultLocation,prayerDays,source} from './prayers';
+import {restoreReminders,validReminderEvent,cleanupMedia} from './reminders';
 import {defaults,buildPlan,dateTR,sleepInfo,clock,at,minute,recipe,type Settings,type PlanEvent,type Session} from '../lib/model';
 export type Device={id:string;settings:string;subscription:string|null;revision:number;updated:number};
 export const parseSettings=(d:Device):Settings=>({...defaults,...JSON.parse(d.settings)});
@@ -74,7 +75,7 @@ export async function dispatch(trigger:'cron'|'manual'='cron'){
  const now=Date.now();await finishDue();
  const active=(await db().prepare('SELECT * FROM devices WHERE subscription IS NOT NULL ORDER BY updated DESC LIMIT 500').all<Device>()).results;
  const last=await kvGet('last-schedule');
- if(!last||now-last.updated>1800000){for(const d of active){try{await schedule(d);}catch{await kvSet('schedule-error:'+d.id,{at:now});}}await kvSet('last-schedule',now);}
+ if(!last||now-last.updated>1800000){for(const d of active){try{await restoreReminders(d);await schedule(d);}catch{await kvSet('schedule-error:'+d.id,{at:now});}}try{await cleanupMedia();}catch{console.error('Unused reminder media cleanup failed');}await kvSet('last-schedule',now);}
  await db().prepare("UPDATE events SET status='expired' WHERE status IN ('pending','sending') AND expires<?").bind(now).run();
  const queue=(await db().prepare("SELECT * FROM events WHERE (status='pending' OR (status='sending' AND lease<?)) AND due<=? AND expires>? AND attempts<4 ORDER BY due LIMIT 100").bind(now,now,now).all<any>()).results;
  const v=queue.length?await vapid():null;let sent=0;
@@ -82,6 +83,7 @@ export async function dispatch(trigger:'cron'|'manual'='cron'){
  const lock=await db().prepare("UPDATE events SET status='sending',lease=?,attempts=attempts+1 WHERE id=? AND (status='pending' OR (status='sending' AND lease<?))").bind(now+90000,item.id,now).run();if(!lock.meta.changes)continue;
  const fresh=await db().prepare('SELECT * FROM devices WHERE id=?').bind(item.device).first<Device>();
  if(!fresh?.subscription||!parseSettings(fresh).reminders||(item.group_id==='plan'&&fresh.revision!==item.revision)){await db().prepare("UPDATE events SET status='cancelled' WHERE id=?").bind(item.id).run();continue;}
+ if(item.group_id.startsWith('custom:')&&!await validReminderEvent(item.group_id.slice(7),fresh.id,item.revision)){await db().prepare("UPDATE events SET status='cancelled' WHERE id=?").bind(item.id).run();continue;}
  // Recheck cancellation after acquiring the lease, before the external send.
  const valid=await db().prepare("SELECT id FROM events WHERE id=? AND status='sending'").bind(item.id).first();if(!valid)continue;
  const receipt=b64(crypto.getRandomValues(new Uint8Array(24)));await kvSet('receipt:'+item.id,receipt);

@@ -57,3 +57,12 @@ Bu sürüm kişisel kullanım ve düşük trafik içindir; bir tick en fazla 100
 - [Apple WebKit: iOS Web Push](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
 - [RFC 8291](https://www.rfc-editor.org/rfc/rfc8291) ve [RFC 8292](https://www.rfc-editor.org/rfc/rfc8292).
 - [CDC: yetişkinlerde uyku](https://www.cdc.gov/sleep/about/index.html).
+# Kişisel hatırlatmalar
+
+Hatırlat sekmesinde başlık, açıklama, tarih ve saat girilir. Saatler Europe/Istanbul (UTC+3) olarak yorumlanır. Kayıtlar D1'de; PNG/JPG/GIF/WebP/MP4/MOV dosyaları R2 `BUCKET` bağında saklanır. Dosya başına 10 MB, cihaz başına 100 MB sınırı vardır. Dosya biçimi içerikten kontrol edilir. Video GET isteklerinde byte range desteklenir.
+
+Kişisel kayıtlar mevcut `/api/tick` göndericisini kullanır; yeni bir Cloudflare zamanlayıcısı gerekmez. Dakikalık cron ve push servisi, tam saniyede teslim garantisi vermez. Bildirim ömrü 15 dakikadır. Düzenleme eski olayını iptal eder; silme bekleyen olayı iptal eder. Namaz konumu değişiklikleri kişisel hatırlatmanın saatini değiştirmez. Bildirimler tekrar açıldığında gelecekteki kayıtlar sıraya geri alınır.
+
+Bildirim başlığı en fazla 80, açıklaması 600 karakterdir. Bildirime dokununca ilgili kaydın açıklaması ve eki açılır. Bildirim görseli yalnız Notifications API `image` alanını destekleyen tarayıcılarda gönderilir; iPhone'da ekler uygulamada görüntülenir. Video bildirimin içinde oynatılmaz. [MDN uyumluluk verisi](https://github.com/mdn/browser-compat-data/blob/main/api/Notification.json).
+
+Dosya URL'leri tahmin edilemeyen, listelenmeyen kimlikler kullanır; bu bağlantıya sahip olan dosyayı açabilir. Dosya ekleme/silme ve hatırlatmaya bağlama cihaz sahipliğiyle doğrulanır. Yüklenip kayda bağlanmayan dosyalar 24 saat sonra temizlenir.
