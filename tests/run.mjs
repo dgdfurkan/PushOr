@@ -36,7 +36,7 @@ globalThis.fetch=async(input,init)=>{
  if(url.startsWith('https://web.push.apple.com/')){accepted.push({url,init});return new Response('',{status:201});}
  throw Error('Unexpected external request '+url);
 };
-async function request(path,body,cookie='',auth=''){return (body===undefined?GET:POST)(new Request('https://test.invalid/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Gun-Akisi':'1',cookie,...(auth?{Authorization:auth}:{})},body:body===undefined?undefined:JSON.stringify(body)}));}
+async function request(path,body,cookie='',auth=''){return (body===undefined?GET:POST)(new Request('https://test.invalid/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Gun-Akisi':'1',cookie,...(auth?{Authorization:auth,'X-Gun-Akisi-Trigger':'cron'}:{})},body:body===undefined?undefined:JSON.stringify(body)}));}
 const first=await request('bootstrap',{});assert.equal(first.status,200);const cookie=first.headers.get('set-cookie').split(';')[0];const firstState=await first.json();assert.equal(firstState.settings.districtId,'12345');
 const second=await request('bootstrap',{});const other=second.headers.get('set-cookie').split(';')[0];assert.notEqual(other,cookie);assert.equal((await request('state',undefined)).status,401);assert.equal((await request('tick',{},cookie)).status,401);
 const ecdh=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
@@ -54,6 +54,7 @@ const done=await(await request('state',undefined,cookie)).json();assert.equal(do
 assert.equal((await request('session/action',{id,action:'stop'},other)).status,400);
 assert.equal((await request('session/start',{id:crypto.randomUUID(),kind:'nap'},cookie)).status,400);
 console.log('PASS: independent device records, secure scheduler, invalid push endpoints, location cancellation, optimistic updates, pause/resume, completed timers');
+const manual=await POST(new Request('https://test.invalid/api/tick',{method:'POST',headers:{Authorization:'Bearer test-only-scheduler-secret'}}));assert.equal(manual.status,200);assert.equal((await(await request('state',undefined,cookie)).json()).scheduler.active,false);
 const tick=await request('tick',{},'', 'Bearer test-only-scheduler-secret');assert.equal(tick.status,200);const tickState=await(await request('state',undefined,cookie)).json();assert.equal(tickState.scheduler.active,true);const count=accepted.length;assert(count>0);await request('tick',{},'','Bearer test-only-scheduler-secret');assert.equal(accepted.length,count);
 console.log('PASS: scheduler dispatch, heartbeat, no duplicate delivery on consecutive ticks');
 // Decrypt a real generated Web Push record independently with HKDF.

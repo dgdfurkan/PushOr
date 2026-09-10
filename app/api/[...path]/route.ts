@@ -14,7 +14,8 @@ async function handler(req:Request){
  const secret=runtime().CRON_SECRET;if(!secret)return json({error:'Zamanlayıcı henüz bağlı değil.'},503);
  const token=req.headers.get('authorization')?.replace(/^Bearer /,'')||'';
  if(await hash(token)!==await hash(secret))return json({error:'Yetkisiz istek.'},401);
- return json(await dispatch());
+ const trigger=req.headers.get('x-gun-akisi-trigger')==='cron'?'cron':'manual';
+ return json(await dispatch(trigger));
  }
  if(path==='receipt'&&req.method==='POST'){
  const data=await body(req);if(typeof data.id!=='string'||data.id.length>240||typeof data.receipt!=='string')return json({error:'Geçersiz bildirim.'},400);

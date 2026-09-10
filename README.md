@@ -16,12 +16,14 @@ Namaz vakitleri, yürüyüş / bisiklet, kısa dinlenme, Pomodoro ve günlük ö
 
 ## Otomatik push için gerekli bağlantı
 
+**Mevcut uygulama için adım adım, terminal gerektirmeyen rehber: [Cloudflare kurulumu](scheduler/KURULUM.md).** GitHub bağlantısında kök klasör `scheduler` seçilir; uygulama adresi ve dakikalık Cron Trigger kodda hazırdır. Tek gizli bağlantı değeri `CRON_SECRET` iki tarafta eşleşmelidir.
+
 **PWA kurulumu ve bildirim izni tek başına zamanlanmış push göndermez.** Site, push kuyruğunu hazırlar. Uygulama kapalıyken gönderim için `scheduler/worker.js` içindeki küçük Cloudflare Worker'ın dakikada bir çalışması gerekir. Bağlantı tamamlanmadan arayüz “zamanlayıcı bekleniyor” gösterir. Test bildirimi bu zamanlayıcıdan bağımsızdır.
 
 1. Siteyi Sites üzerinde D1 (`DB`) ile yayımla. Mantıksal kaynak `.openai/hosting.json` içindedir.
 2. Rastgele, en az 32 baytlık bir `CRON_SECRET` oluştur. Site runtime'ına gizli değer olarak ekle. `SITE_ORIGIN` değerini yayın adresine ayarla ve yeniden yayımla.
 3. `scheduler/wrangler.jsonc` ile Cloudflare hesabında companion Worker'ı yayımla. Aynı `CRON_SECRET` ve `SITE_ORIGIN` değerlerini bu Worker'a da ver. Gizli anahtarı depoya veya istemciye koyma.
-4. Zamanlayıcı `POST /api/tick` çağrısını `Authorization: Bearer …` ile dakikada bir yapar. UI, 150 saniyeden eski bağlantıyı etkin göstermez.
+4. Zamanlayıcı `POST /api/tick` çağrısını `Authorization: Bearer …` ve `X-Gun-Akisi-Trigger: cron` ile dakikada bir yapar. UI, 150 saniyeden eski bağlantıyı etkin göstermez. Worker adresindeki bağlantı testi `manual` kullanır; otomatik gönderimi etkin gibi göstermez. Sağlık kaydı işlem başarıyla tamamlandığında güncellenir.
 5. iPhone'da Safari → Paylaş → Ana Ekrana Ekle. Eklenen simgeden aç, bildirim izni ver, test gönder. iOS 16.4+ gerekir.
 
 Alternatif bir güvenilir zamanlayıcı da aynı korumalı endpoint'i dakikada bir çağırabilir. GitHub Actions zamanlaması dakik bildirimler için kullanılmıyor. Bu depodaki scheduler dosyalarının bulunması, scheduler'ın yayımlandığı anlamına gelmez.
@@ -33,7 +35,7 @@ Push tam saat garantili alarm değildir: cihaz çevrimdışıysa / Odak modu sus
 Node 24 ve pnpm. `pnpm install`, `pnpm dev`, `pnpm build`.
 
 - `pnpm typecheck`: TypeScript denetimi.
-- `pnpm test`: gerçek SQLite üzerinde cihaz izolasyonu, konum değişiminde kuyruk iptali, eşzamanlı ayar sürümü, idempotent oturum başlatma, duraklatma / devam, gece yarısı, izin günü, uyku sınırı, scheduler tekrarında çift gönderim ve bağımsız Web Push deşifre / VAPID doğrulaması.
+- `pnpm test`: gerçek SQLite üzerinde cihaz izolasyonu, konum değişiminde kuyruk iptali, eşzamanlı ayar sürümü, idempotent oturum başlatma, duraklatma / devam, gece yarısı, izin günü, uyku sınırı, scheduler tekrarında çift gönderim ve bağımsız Web Push deşifre / VAPID doğrulaması. Companion Worker için anahtar denetimi, manuel/otomatik ayrımı, ayar doğrulama, hata iletimi ve bağlantı sayfasının JavaScript denetimi.
 - `pnpm db:generate`: Drizzle migration üretimi. Yayımlanmış migration değiştirilmez.
 
 Testlerde saat ve namaz verileri açıkça fixture olarak kullanılır; bunlar gerçek günlük veri doğrulaması veya fiziksel iPhone testi değildir. Yeni ilçedeki geçerli veri gelmezse mevcut konum korunur. Vakit servisi yoksa doğrulanmamış saat uydurulmaz.

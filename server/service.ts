@@ -70,8 +70,8 @@ export async function modifySession(d:Device,id:string,action:string){
  db().prepare("UPDATE events SET status='cancelled' WHERE device=? AND group_id=? AND status IN ('pending','sending')").bind(d.id,id)]);
  const updated={...x,status,ends,elapsed};if(status==='running'&&parseSettings(d).reminders&&d.subscription)await sessionEvents(d,updated);return updated;
 }
-export async function dispatch(){
- const now=Date.now();await kvSet('heartbeat',{at:now});await finishDue();
+export async function dispatch(trigger:'cron'|'manual'='cron'){
+ const now=Date.now();await finishDue();
  const active=(await db().prepare('SELECT * FROM devices WHERE subscription IS NOT NULL ORDER BY updated DESC LIMIT 500').all<Device>()).results;
  const last=await kvGet('last-schedule');
  if(!last||now-last.updated>1800000){for(const d of active){try{await schedule(d);}catch{await kvSet('schedule-error:'+d.id,{at:now});}}await kvSet('last-schedule',now);}
@@ -95,5 +95,7 @@ export async function dispatch(){
  await db().prepare("UPDATE events SET status='failed' WHERE status='pending' AND attempts>=4").run();
  await db().prepare("DELETE FROM events WHERE expires<?").bind(now-30*86400000).run();
  await db().prepare("DELETE FROM kv WHERE key LIKE 'receipt:%' AND updated<?").bind(now-86400000).run();
- return {sent,checked:queue.length,at:now};
+ // A manual connection test must not masquerade as an automatic cron run.
+ const completedAt=Date.now();await kvSet(trigger==='cron'?'heartbeat':'manual-heartbeat',{at:completedAt});
+ return {sent,checked:queue.length,at:completedAt};
 }

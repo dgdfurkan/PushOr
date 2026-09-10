@@ -1,0 +1,9 @@
+{
+  "name": "gun-akisi-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": { "deploy": "wrangler deploy" },
+  "devDependencies": { "wrangler": "4.92.0" }
+}
