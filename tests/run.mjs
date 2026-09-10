@@ -35,7 +35,7 @@ globalThis.fetch=async(input,init)=>{
  if(url.includes('/ilceler/'))return Response.json([{IlceID:9206,IlceAdi:'ANKARA'},{IlceID:'9207',IlceAdi:'AYAŞ'}]);
  if(url.includes('/sehirler/'))return Response.json([{SehirID:506,SehirAdi:'ANKARA'}]);
  if(url.includes('/vakitler/')){prayerRequests++;if(prayerOutage)throw Error('network offline');return Response.json(Array.from({length:3},(_,i)=>({MiladiTarihKisa:`${10+i}.09.2026`,Imsak:'05:00',Gunes:url.endsWith('9207')?'06:22':'06:20',Ogle:'12:50',Ikindi:'16:20',Aksam:'19:10',Yatsi:'20:30'})));}
- if(url.startsWith('https://web.push.apple.com/')){accepted.push({url,init});return new Response('',{status:201});}
+ if(url.startsWith('https://web.push.apple.com/')){assert.equal(init.redirect,'manual','Workers push must not use unsupported error mode or follow redirects');accepted.push({url,init});return new Response('',{status:201});}
  throw Error('Unexpected external request '+url);
 };
 async function request(path,body,cookie='',auth=''){return (body===undefined?GET:POST)(new Request('https://test.invalid/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Gun-Akisi':'1',cookie,...(auth?{Authorization:auth,'X-Gun-Akisi-Trigger':'cron'}:{})},body:body===undefined?undefined:JSON.stringify(body)}));}

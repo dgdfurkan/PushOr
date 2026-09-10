@@ -37,5 +37,7 @@ export async function sendPush(s:Subscription,payload:unknown,vapid:{private:Jso
  const key=await crypto.subtle.importKey('jwk',vapid.private,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
  const sig=b64(new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,enc.encode(header+'.'+claims))));
  const body=await encryptPayload(s,JSON.stringify(payload));
- return fetch(s.endpoint,{method:'POST',headers:{Authorization:`vapid t=${header}.${claims}.${sig}, k=${vapid.public}`,'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream',TTL:String(Math.max(0,Math.min(900,ttl))),Urgency:'high'},body,redirect:'error',signal:AbortSignal.timeout(12000)});
+ // Manual redirects are supported by Workers and keep VAPID headers on the
+ // validated push-service host. Callers treat 3xx responses as delivery failures.
+ return fetch(s.endpoint,{method:'POST',headers:{Authorization:`vapid t=${header}.${claims}.${sig}, k=${vapid.public}`,'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream',TTL:String(Math.max(0,Math.min(900,ttl))),Urgency:'high'},body,redirect:'manual',signal:AbortSignal.timeout(12000)});
 }

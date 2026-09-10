@@ -10,7 +10,11 @@ const request = (path, method = 'GET', key, extra = {}) => new Request(origin + 
 const originalFetch = globalThis.fetch;
 const calls = [];
 let response = () => Response.json({ sent: 0, checked: 0, at: Date.now() });
-globalThis.fetch = async (url, options) => { calls.push({ url, options }); return response(); };
+globalThis.fetch = async (url, options) => {
+  // Reproduce the live Workers restriction that Node's fetch does not enforce.
+  if (options.redirect === 'error') throw new TypeError('Invalid redirect value: error');
+  calls.push({ url, options }); return response();
+};
 try {
   const page = await worker.fetch(request('/'), env);
   const html = await page.text();
@@ -21,6 +25,9 @@ try {
   const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
   new Function(script);
   assert.equal((await worker.fetch(request('/health'), {})).status, 503);
+  const healthAlias=await worker.fetch(request('/api/health'), env);
+  assert.equal(healthAlias.status,200);
+  assert.equal((await healthAlias.json()).configured,true);
   assert.equal((await worker.fetch(request('/health'), { ...env, SITE_ORIGIN: 'https://example.com/api/tick' })).status, 503);
   assert.equal((await worker.fetch(request('/health'), { ...env, SITE_ORIGIN: 'http://example.com' })).status, 503);
   assert.equal((await worker.fetch(request('/run', 'POST'), env)).status, 401);
@@ -34,9 +41,16 @@ try {
   assert.equal(calls[0].url, 'https://gun-akisi.gunduz.chatgpt.site/api/tick');
   assert.equal(calls[0].options.headers['X-Gun-Akisi-Trigger'], 'manual');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer ' + secret);
-  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(calls[0].options.redirect, 'manual');
   await worker.scheduled({}, env, {});
   assert.equal(calls.at(-1).options.headers['X-Gun-Akisi-Trigger'], 'cron');
+
+  const beforeRedirect = calls.length;
+  response = () => new Response(null, { status: 302, headers: { Location: 'https://untrusted.example/' } });
+  const redirected = await worker.fetch(request('/run', 'POST', secret), env);
+  assert.equal(redirected.status, 502);
+  assert.match((await redirected.json()).error, /yönlendiriyor/);
+  assert.equal(calls.length, beforeRedirect + 1, 'must not follow a redirect with the connection key');
 
   response = () => new Response('unauthorized detail never echoed', { status: 401 });
   const denied = await worker.fetch(request('/run', 'POST', secret), env);

@@ -49,6 +49,8 @@ Oluşan **gun-akisi-scheduler** uygulamasını aç. **Settings → Variables and
 
 ## 4. Bağlantıyı dene
 
+Günlük kullanacağın PWA adresi **https://gun-akisi.gunduz.chatgpt.site**. Cloudflare’ın `workers.dev` adresi bildirim servisinin bağlantı kontrol ekranıdır; bu ekranın açılması beklenen davranıştır. Sağlık kontrolü için Worker adresinin sonuna `/health` veya `/api/health` ekleyebilirsin. `configured: true` anahtar/adres ayarlarının bulunduğunu gösterir; anahtarın eşleştiğini veya cron çalıştığını kanıtlamaz.
+
 Worker ekranındaki **Visit** bağlantısını veya gösterilen `workers.dev` adresini aç. “Bağlantıyı kontrol edelim” ekranı gelecek.
 
 Az önce kullandığın anahtarı **Bağlantı anahtarı** alanına yapıştır ve **Bağlantıyı dene** düğmesine bas. **“Bağlantı tamam”** mesajı görmelisin. `0 bildirim gönderildi` normaldir: o anda zamanı gelmiş bildirim olmayabilir.
