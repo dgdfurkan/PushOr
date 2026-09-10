@@ -1,5 +1,5 @@
 export type Settings = {
- cityId: string; cityName: string; districtId: string; districtName: string; prayerAreaName?: string;
+ cityId: string; cityName: string; districtId: string; districtName: string; prayerAreaName?: string; adminDistrictId?: string; regionName?: string;
  bedtime: string; workStart: string; workEnd: string; sleepTarget: number;
  focusMinutes: number; breakMinutes: number; walkMinutes: number; bikeMinutes: number;
  offDays: string[]; gentleDays: string[]; skippedNaps: string[]; ingredients: string[];
@@ -76,6 +76,8 @@ export function validateSettings(input:unknown,base:Settings):Settings {
  const o=input as Record<string,unknown>,s={...base};
  for(const k of ['cityId','districtId'] as const)if(k in o){if(typeof o[k]!=='string'||!/^\d{1,8}$/.test(o[k] as string))throw Error('İl ve ilçeyi listeden seç.');s[k]=o[k] as string;}
  for(const k of ['cityName','districtName'] as const)if(k in o){if(typeof o[k]!=='string'||!(o[k] as string).trim()||(o[k] as string).length>80)throw Error('Geçersiz konum.');s[k]=o[k] as string;}
+ if('adminDistrictId' in o){if(typeof o.adminDistrictId!=='string'||!/^\d{0,8}$/.test(o.adminDistrictId))throw Error('İlçeyi listeden seç.');s.adminDistrictId=o.adminDistrictId;}
+ if('regionName' in o){if(typeof o.regionName!=='string'||o.regionName.length>80||/[\u0000-\u001f\u007f]/.test(o.regionName))throw Error('Mahalle / bölge adı en fazla 80 karakter olabilir.');s.regionName=o.regionName.trim().replace(/\s+/g,' ');}
  for(const k of ['bedtime','workStart','workEnd'] as const)if(k in o){if(typeof o[k]!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(o[k] as string))throw Error('Saati kontrol et.');s[k]=o[k] as string;}
  for(const [k,min,max] of [['sleepTarget',7,10],['focusMinutes',10,90],['breakMinutes',3,30],['walkMinutes',10,90],['bikeMinutes',10,90]] as const)if(k in o){const v=o[k];if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max)throw Error('Süre izin verilen aralığın dışında.');s[k]=v;}
  for(const k of ['reminders','recoverySleep'] as const)if(k in o){if(typeof o[k]!=='boolean')throw Error('Ayar geçersiz.');s[k]=o[k] as boolean;}

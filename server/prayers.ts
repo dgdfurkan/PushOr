@@ -1,6 +1,7 @@
 import {kvGet,kvSet} from './db';
 import {dateTR,type PrayerDay} from '../lib/model';
-import {locationKey,type LocationOption} from '../lib/location';
+import {locationKey,type LocationOption,type DistrictChoices} from '../lib/location';
+import catalogue from './data/turkey-districts.json';
 const BASE='https://ezanvakti.emushaf.net';
 export const source={name:'Diyanet verisi · EzanVakti API',url:BASE,official:'https://namazvakitleri.diyanet.gov.tr/'};
 const pending=new Map<string,Promise<unknown>>();
@@ -47,7 +48,21 @@ export async function defaultLocation(force=false){
  const exact=rows.find(x=>locationKey(x.name)==='etimesgut');
  const item=exact||rows.find(x=>locationKey(x.name)==='ankara');
  if(!item)throw Error('Ankara merkez takvimi alınamadı. Konum listesini yenileyebilirsin.');
- return {districtId:item.id,districtName:'Etimesgut',prayerAreaName:item.name};
+ return {districtId:item.id,districtName:'Etimesgut',prayerAreaName:item.name,adminDistrictId:'1922'};
+}
+export async function districtChoices(cityId:string,force=false):Promise<DistrictChoices>{
+ const [cs,areas]=await Promise.all([cities(force),districts(cityId,force)]);
+ const city=cs.find(x=>x.id===cityId);if(!city)throw Error('İl seçimi geçersiz.');
+ const province=catalogue.find(x=>locationKey(x.name)===locationKey(city.name));
+ if(!province)throw Error('Bu ilin ilçe listesi bulunamadı. Listeyi yenileyebilirsin.');
+ const byName=new Map(areas.map(x=>[locationKey(x.name),x]));
+ const rows=province.districts.map(x=>{
+  const name=locationKey(x.name);
+  const area=byName.get(name)||(name==='merkez'?byName.get(locationKey(city.name)):undefined)
+   ||(cityId==='506'&&name==='etimesgut'?byName.get('ankara'):undefined);
+  return {...x,...(area?{prayerId:area.id,prayerAreaName:area.name}:{}),...(cityId==='506'&&name==='etimesgut'?{aliases:['Eryaman']}: {})};
+ });
+ return {districts:rows.sort((a,b)=>a.name.localeCompare(b.name,'tr')),areas};
 }
 export async function defaultDistrict(){return (await defaultLocation()).districtId;}
 

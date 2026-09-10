@@ -4,6 +4,22 @@ Bu adımlar mevcut [Gün Akışı uygulamasının](https://gun-akisi.gunduz.chat
 
 Bu klasördeki küçük program dakikada bir uygulamaya haber verir; zamanı gelen bildirimleri uygulamanın sunucusu gönderir. Telefonunda uygulamanın açık olması gerekmez.
 
+## Zaten kurulu Worker'ı güncellemek için
+
+`db402775` düzeltmesini veya ondan sonraki `main` sürümünü yayımlamak için:
+
+1. [Cloudflare paneline](https://dash.cloudflare.com/) gir. Hesabını seç, **Workers & Pages** listesinden **gun-akisi-scheduler** adına tıkla.
+2. **Settings → Build → Build configuration** bölümünü aç. **Root directory** `scheduler`, **Build command** boş, **Deploy command** `npx wrangler deploy` olmalı. Git deposu `dgdfurkan/PushOr`, üretim dalı `main` olmalı. Değiştirdiysen kaydet.
+3. Üstteki **Deployments** sekmesine geç. Sayfanın altına inip **View Build History** (derleme geçmişi) bağlantısına tıkla.
+4. `main` dalındaki en güncel kaydı bul. Commit kodunu [GitHub commit listesiyle](https://github.com/dgdfurkan/PushOr/commits/main/) karşılaştır. Yeni sürüm daha ilerideyse `db402775` kodunu aramana gerek yok; düzeltmeyi o da içerir.
+5. O kaydın yanındaki **⋯** menüsüne bas, **Retry build** seç. Aynı düğme kaydın detay sayfasında da bulunur. Eski bir kaydı tekrar denemek yeni commit'i seçmez; güncel kaydı kullandığından emin ol.
+6. Derleme ve dağıtımın başarılı olmasını bekle. [Sağlık kontrolünü aç](https://gun-akisi-scheduler.frkngndz60.workers.dev/api/health): yanıtta `version: "2026-09-10.2"` görünmeli. `{"error":"Bulunamadı."}` eski kodun hâlâ yayında olduğunu gösterir.
+7. [Gün Akışı ayarlarını](https://gun-akisi.gunduz.chatgpt.site/?view=settings) aç. **Zamanlayıcı çalışıyor** durumu gerçek dakikalık çalışmayı doğrular. Sağlık sayfasındaki `configured: true` tek başına bunu doğrulamaz.
+
+Güncel commit derleme geçmişinde hiç yoksa **Settings → Build** içinde GitHub bağlantısı, `PushOr` deposu, `main` dalı ve otomatik derleme ayarlarını kontrol et. GitHub'a yeni commit geldiğinde bağlı dal için derleme otomatik başlar. Bir hata olursa derleme detayının en altındaki hata metni teşhis için gereklidir.
+
+[Cloudflare: View Build History ve Retry build](https://developers.cloudflare.com/workers/ci-cd/builds/troubleshoot/), [Build ayarları](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
+
 ## 1. Cloudflare hesabını aç
 
 [Cloudflare kayıt sayfasına](https://dash.cloudflare.com/sign-up) gir, hesap oluştur ve istenirse e-posta adresini doğrula. Hesabın varsa giriş yap. Workers Free planıyla başlayabilirsin; kendi alan adını satın alman gerekmez, Cloudflare bir `workers.dev` adresi verir.

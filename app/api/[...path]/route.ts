@@ -1,5 +1,5 @@
 import {db,kvGet,kvSet,runtime} from '../../../server/db';
-import {cities,districts,prayerDays} from '../../../server/prayers';
+import {cities,districts,districtChoices,prayerDays} from '../../../server/prayers';
 import {identify,createDevice,state,parseSettings,ensureDistrict,schedule,restoreActive,vapid,startSession,modifySession,dispatch,hash,type Device} from '../../../server/service';
 import {validateSettings,defaults} from '../../../lib/model';
 import {sendPush,validateSubscription} from '../../../server/push';
@@ -24,7 +24,7 @@ async function handler(req:Request){
  }
  if(req.method==='POST'&&(req.headers.get('x-gun-akisi')!=='1'||req.headers.get('sec-fetch-site')==='cross-site'))return json({error:'İstek doğrulanamadı.'},403);
  if(path==='locations'&&req.method==='GET'){
- const city=url.searchParams.get('city'),force=url.searchParams.get('refresh')==='1';return json(city?await districts(city,force):await cities(force));
+ const city=url.searchParams.get('city'),force=url.searchParams.get('refresh')==='1';return json(city?(url.searchParams.get('administrative')==='1'?await districtChoices(city,force):await districts(city,force)):await cities(force));
  }
  if(path==='vapid'&&req.method==='GET')return json({publicKey:(await vapid()).public});
  let d=await identify(req);
@@ -38,10 +38,22 @@ async function handler(req:Request){
  if(path==='settings'){
  const old=parseSettings(d),s=validateSettings(input.settings,old);
  if(input.revision!==d.revision)return json({error:'Ayarlar başka bir ekranda değişmiş. Yenileyip tekrar dene.'},409);
- if(s.districtId!==old.districtId||s.cityId!==old.cityId){
- const [cs,ds]=await Promise.all([cities(),districts(s.cityId)]);const city=cs.find((x:any)=>x.id===s.cityId),district=ds.find((x:any)=>x.id===s.districtId);if(!city||!district)throw Error('İl ve ilçe eşleşmiyor.');s.cityName=city.name;s.districtName=district.name;s.prayerAreaName=district.name;
+ // Old clients only send provider IDs. Clear administrative/region labels on their location changes.
+ const providerChanged=s.districtId!==old.districtId||s.cityId!==old.cityId;
+ if(providerChanged&&!('adminDistrictId' in input.settings))s.adminDistrictId='';
+ if(providerChanged||s.adminDistrictId!==old.adminDistrictId){
+ const [cs,ds]=await Promise.all([cities(),districts(s.cityId)]);const city=cs.find(x=>x.id===s.cityId),district=ds.find(x=>x.id===s.districtId);if(!city||!district)throw Error('İl ve takvim eşleşmiyor.');s.cityName=city.name;s.districtName=district.name;s.prayerAreaName=district.name;
+ if(s.adminDistrictId){
+  const choices=await districtChoices(s.cityId),admin=choices.districts.find(x=>x.id===s.adminDistrictId);
+  if(!admin)throw Error('İl ve ilçe eşleşmiyor.');
+  if(admin.prayerId&&admin.prayerId!==s.districtId)throw Error('Seçilen ilçenin takvimi değişmiş. Konumu yeniden seç.');
+  s.districtName=admin.name;
+ }
+ if(!('regionName' in input.settings))s.regionName='';
  const days=await prayerDays(s.districtId);if(!days.length)throw Error('Yeni konumun vakitleri alınamadı. Önceki konum korunuyor.');
  }
+ // Labels are canonical server data; a region label never overrides the provider calendar.
+ if(!providerChanged&&s.adminDistrictId===old.adminDistrictId){s.cityName=old.cityName;s.districtName=old.districtName;s.prayerAreaName=old.prayerAreaName;}
  const updated=await db().prepare('UPDATE devices SET settings=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(s),Date.now(),d.id,d.revision).run();if(!updated.meta.changes)return json({error:'Ayarlar değişmiş. Sayfayı yenile.'},409);
  d=(await db().prepare('SELECT * FROM devices WHERE id=?').bind(d.id).first<Device>())!;
  await db().prepare("UPDATE events SET status='cancelled' WHERE device=? AND status IN ('pending','sending') AND (group_id='plan' OR ?=0)").bind(d.id,s.reminders?1:0).run();

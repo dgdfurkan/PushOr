@@ -25,6 +25,7 @@
 .app-dialog.location-dialog{padding:0;overflow:visible;display:block;max-height:calc(100dvh - 40px)}
 .location-dialog-body{display:flex;flex-direction:column;gap:20px;min-width:0;padding:28px;max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain}
 .location-dialog-body [data-slot=dialog-header]{padding-right:16px}.location-dialog-body .notice{margin:0}
+.location-calendar{display:flex;flex-direction:column;gap:5px;padding:14px 16px;border-radius:14px;background:#f2eef9;font-size:13px;overflow-wrap:anywhere}.location-calendar span{color:#716980;line-height:1.6}.region-suggestion{align-self:flex-start;min-height:38px;margin-top:-10px;padding:6px 15px;border:1px solid #dfd6ed;border-radius:20px;background:#faf8ff;color:var(--primary);font-size:13px}.location-card>span{min-width:0;overflow-wrap:anywhere}.footer-location{overflow-wrap:anywhere}
 .location-options[data-slot=combobox-content]{min-width:0;width:var(--anchor-width);max-width:min(var(--available-width),calc(100vw - 40px));border-radius:12px}
 .location-options [data-slot=combobox-list]{max-height:min(260px,max(80px,calc(var(--available-height) - 16px)));overscroll-behavior:contain}
 .location-options [data-slot=combobox-item]{min-height:44px;font-size:16px;padding-top:10px;padding-bottom:10px;white-space:normal;overflow-wrap:anywhere}
