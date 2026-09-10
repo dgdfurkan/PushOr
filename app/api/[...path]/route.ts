@@ -1,6 +1,6 @@
 import {db,kvGet,kvSet,runtime} from '../../../server/db';
 import {cities,districts,prayerDays} from '../../../server/prayers';
-import {identify,createDevice,state,parseSettings,schedule,restoreActive,vapid,startSession,modifySession,dispatch,hash,type Device} from '../../../server/service';
+import {identify,createDevice,state,parseSettings,ensureDistrict,schedule,restoreActive,vapid,startSession,modifySession,dispatch,hash,type Device} from '../../../server/service';
 import {validateSettings,defaults} from '../../../lib/model';
 import {sendPush,validateSubscription} from '../../../server/push';
 const json=(value:unknown,status=200,headers:Record<string,string>={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...headers}});
@@ -24,7 +24,7 @@ async function handler(req:Request){
  }
  if(req.method==='POST'&&(req.headers.get('x-gun-akisi')!=='1'||req.headers.get('sec-fetch-site')==='cross-site'))return json({error:'İstek doğrulanamadı.'},403);
  if(path==='locations'&&req.method==='GET'){
- const city=url.searchParams.get('city');return json(city?await districts(city):await cities());
+ const city=url.searchParams.get('city'),force=url.searchParams.get('refresh')==='1';return json(city?await districts(city,force):await cities(force));
  }
  if(path==='vapid'&&req.method==='GET')return json({publicKey:(await vapid()).public});
  let d=await identify(req);
@@ -39,7 +39,7 @@ async function handler(req:Request){
  const old=parseSettings(d),s=validateSettings(input.settings,old);
  if(input.revision!==d.revision)return json({error:'Ayarlar başka bir ekranda değişmiş. Yenileyip tekrar dene.'},409);
  if(s.districtId!==old.districtId||s.cityId!==old.cityId){
- const [cs,ds]=await Promise.all([cities(),districts(s.cityId)]);const city=cs.find((x:any)=>x.id===s.cityId),district=ds.find((x:any)=>x.id===s.districtId);if(!city||!district)throw Error('İl ve ilçe eşleşmiyor.');s.cityName=city.name;s.districtName=district.name;
+ const [cs,ds]=await Promise.all([cities(),districts(s.cityId)]);const city=cs.find((x:any)=>x.id===s.cityId),district=ds.find((x:any)=>x.id===s.districtId);if(!city||!district)throw Error('İl ve ilçe eşleşmiyor.');s.cityName=city.name;s.districtName=district.name;s.prayerAreaName=district.name;
  const days=await prayerDays(s.districtId);if(!days.length)throw Error('Yeni konumun vakitleri alınamadı. Önceki konum korunuyor.');
  }
  const updated=await db().prepare('UPDATE devices SET settings=?,revision=revision+1,updated=? WHERE id=? AND revision=?').bind(JSON.stringify(s),Date.now(),d.id,d.revision).run();if(!updated.meta.changes)return json({error:'Ayarlar değişmiş. Sayfayı yenile.'},409);
@@ -65,7 +65,7 @@ async function handler(req:Request){
  }
  if(path==='session/start')return json(await startSession(d,input.kind,input.id));
  if(path==='session/action')return json(await modifySession(d,input.id,input.action));
- if(path==='refresh-plan'){await schedule(d);return json(await state(d));}
+ if(path==='refresh-plan'){d=await ensureDistrict(d);await prayerDays(parseSettings(d).districtId,true);await schedule(d);await restoreActive(d);return json(await state(d));}
  return json({error:'Bulunamadı.'},404);
  }catch(e){console.error('Gün Akışı request failed',e instanceof Error?e.message:'Unknown');const msg=e instanceof Error?e.message:'';return json({error:/D1|SQLITE|fetch|timeout|JSON|network/i.test(msg)?'Servise şu an ulaşılamıyor. Birazdan yeniden dene.':msg||'İşlem tamamlanamadı.'},400);}
 }

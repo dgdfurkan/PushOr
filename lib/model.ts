@@ -1,5 +1,5 @@
 export type Settings = {
- cityId: string; cityName: string; districtId: string; districtName: string;
+ cityId: string; cityName: string; districtId: string; districtName: string; prayerAreaName?: string;
  bedtime: string; workStart: string; workEnd: string; sleepTarget: number;
  focusMinutes: number; breakMinutes: number; walkMinutes: number; bikeMinutes: number;
  offDays: string[]; gentleDays: string[]; skippedNaps: string[]; ingredients: string[];

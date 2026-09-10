@@ -11,3 +11,22 @@
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 .location-input{width:100%;height:46px;border-radius:11px}.location-input input{border:0!important;background:transparent!important;font-size:16px!important;box-shadow:none!important;min-height:42px}
+
+/* Keep narrow screens and enlarged text inside their own layout cells. */
+.main-grid>*,.two-grid>*,.activity-grid>*,.settings-grid>div,.card,.page-heading>div{min-width:0}
+.header{gap:16px}.brand{flex-shrink:0}.header-tools,.location-button{min-width:0}.location-button span{min-width:0;max-width:22ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.next-time{flex-wrap:wrap;column-gap:16px;row-gap:0}.next-time span{min-width:0;overflow-wrap:anywhere}.next-footer{flex-wrap:wrap}.next-footer>span{min-width:0}
+.notice{flex-wrap:wrap}.notice>span{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}.notice-actions{display:flex;flex-wrap:wrap;gap:15px}.notice-actions button{min-height:40px}
+.active-activity,.timer-actions{flex-wrap:wrap}.push-banner>span:nth-child(2),.connection-steps>div>span:nth-child(2),.switch-row>span,.session-row>span:nth-child(2){min-width:0;overflow-wrap:anywhere}.circle-icon,.step{flex-shrink:0}
+.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field input{min-width:0;max-width:100%;font-size:16px}.date-picker{max-width:100%;min-width:0}.date-picker input{max-width:100%;font-size:16px}
+.timer-ring,.compact .timer-ring{height:auto;aspect-ratio:1}.timer-digits{max-width:100%}
+.prayer-area-note{font-size:13px;line-height:1.6;color:#7b7289;margin:0 0 18px;overflow-wrap:anywhere}
+.push-panel{margin-bottom:24px}.push-panel .push-banner{margin-bottom:10px}.push-test{min-height:46px}.push-panel .push-test{width:100%;background:#fff}
+.app-dialog.location-dialog{padding:0;overflow:visible;display:block;max-height:calc(100dvh - 40px)}
+.location-dialog-body{display:flex;flex-direction:column;gap:20px;min-width:0;padding:28px;max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain}
+.location-dialog-body [data-slot=dialog-header]{padding-right:16px}.location-dialog-body .notice{margin:0}
+.location-options[data-slot=combobox-content]{min-width:0;width:var(--anchor-width);max-width:min(var(--available-width),calc(100vw - 40px));border-radius:12px}
+.location-options [data-slot=combobox-list]{max-height:min(260px,max(80px,calc(var(--available-height) - 16px)));overscroll-behavior:contain}
+.location-options [data-slot=combobox-item]{min-height:44px;font-size:16px;padding-top:10px;padding-bottom:10px;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:640px){.header-tools{max-width:48%}.location-button span{max-width:15ch}.push-panel{margin-bottom:20px}.location-dialog-body{padding:25px 22px}.button-row>.push-test{width:100%}.session-row{gap:8px}.session-row strong{max-width:35%;text-align:right}.timer-ring{width:min(250px,100%)}.next-time{font-size:clamp(52px,18vw,70px)}.next-card .section-top{align-items:flex-start}.next-card .eyebrow{letter-spacing:.7px}.footer-location{margin-left:0;width:100%}}
+@media(max-width:360px){.activity-grid{grid-template-columns:1fr}.move-bottom{justify-content:space-between}.move-card p{min-height:0}.form-grid{column-gap:10px}.location-button span{max-width:10ch}.timer-digits{font-size:50px}.prayer-strip{gap:2px}.prayer-strip b{font-size:13px}}

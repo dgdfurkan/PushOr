@@ -10,10 +10,12 @@ const scratch=new URL('../.test-output/',import.meta.url);mkdirSync(scratch,{rec
 const sqlite=new DatabaseSync(':memory:');sqlite.exec(readFileSync(new URL('../drizzle/0000_puzzling_hellfire_club.sql',import.meta.url),'utf8').replaceAll('--> statement-breakpoint',''));
 const d1={prepare(sql){const stmt=sqlite.prepare(sql);let params=[];const api={bind(...p){params=p;return api;},async first(){return stmt.get(...params)||null;},async all(){return {results:stmt.all(...params)};},async run(){const r=stmt.run(...params);return {meta:{changes:Number(r.changes)}};}};return api;},async batch(queries){sqlite.exec('BEGIN');try{const out=[];for(const q of queries)out.push(await q.run());sqlite.exec('COMMIT');return out;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
 globalThis.__TEST_ENV__={DB:d1,CRON_SECRET:'test-only-scheduler-secret',SITE_ORIGIN:'https://test.invalid'};
-await build({entryPoints:['app/api/[...path]/route.ts','lib/model.ts','server/push.ts'],outdir:scratch.pathname,bundle:true,platform:'node',format:'esm',entryNames:'[name]',plugins:[{name:'test-env',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'env',namespace:'test-env'}));b.onLoad({filter:/.*/,namespace:'test-env'},()=>({contents:'export const env=globalThis.__TEST_ENV__',loader:'js'}));}}]});
+await build({entryPoints:['app/api/[...path]/route.ts','lib/model.ts','server/push.ts','server/prayers.ts','lib/location.ts'],outdir:scratch.pathname,bundle:true,platform:'node',format:'esm',entryNames:'[name]',plugins:[{name:'test-env',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'env',namespace:'test-env'}));b.onLoad({filter:/.*/,namespace:'test-env'},()=>({contents:'export const env=globalThis.__TEST_ENV__',loader:'js'}));}}]});
 const {GET,POST}=await import(pathToFileURL(scratch.pathname+'route.js'));
 const m=await import(pathToFileURL(scratch.pathname+'model.js'));
 const push=await import(pathToFileURL(scratch.pathname+'push.js'));
+const prayers=await import(pathToFileURL(scratch.pathname+'prayers.js'));
+const locations=await import(pathToFileURL(scratch.pathname+'location.js'));
 let now=Date.parse('2026-09-10T11:00:00+03:00');const realNow=Date.now;Date.now=()=>now;
 const p={date:'2026-09-10',imsak:'05:00',sunrise:'06:20',noon:'12:50',afternoon:'16:20',sunset:'19:10',night:'20:30'};
 const s={...m.defaults,districtId:'12345'};
@@ -27,24 +29,46 @@ const skip=m.buildPlan(p,{...s,skippedNaps:[p.date]});assert(!skip.some(x=>x.kin
 assert(m.sleepInfo(p,s).recovery>=180);assert.throws(()=>m.validateSettings({sleepTarget:4},s));assert.throws(()=>m.validateSettings({bedtime:'25:10'},s));
 console.log('PASS: daily offsets, midnight shift, days off, missed nap and sleep guardrails');
 const originalFetch=globalThis.fetch;
-const accepted=[];
+const accepted=[];let prayerRequests=0;let prayerOutage=false;
 globalThis.fetch=async(input,init)=>{
  const url=String(input);
- if(url.includes('/ilceler/'))return Response.json([{IlceID:'12345',IlceAdi:'ETİMESGUT'},{IlceID:'12346',IlceAdi:'SİNCAN'}]);
- if(url.includes('/sehirler/'))return Response.json([{SehirID:'506',SehirAdi:'ANKARA'}]);
- if(url.includes('/vakitler/'))return Response.json(Array.from({length:3},(_,i)=>({MiladiTarihKisa:`${10+i}.09.2026`,Imsak:'05:00',Gunes:url.endsWith('12346')?'06:22':'06:20',Ogle:'12:50',Ikindi:'16:20',Aksam:'19:10',Yatsi:'20:30'})));
+ if(url.includes('/ilceler/'))return Response.json([{IlceID:9206,IlceAdi:'ANKARA'},{IlceID:'9207',IlceAdi:'AYAŞ'}]);
+ if(url.includes('/sehirler/'))return Response.json([{SehirID:506,SehirAdi:'ANKARA'}]);
+ if(url.includes('/vakitler/')){prayerRequests++;if(prayerOutage)throw Error('network offline');return Response.json(Array.from({length:3},(_,i)=>({MiladiTarihKisa:`${10+i}.09.2026`,Imsak:'05:00',Gunes:url.endsWith('9207')?'06:22':'06:20',Ogle:'12:50',Ikindi:'16:20',Aksam:'19:10',Yatsi:'20:30'})));}
  if(url.startsWith('https://web.push.apple.com/')){accepted.push({url,init});return new Response('',{status:201});}
  throw Error('Unexpected external request '+url);
 };
 async function request(path,body,cookie='',auth=''){return (body===undefined?GET:POST)(new Request('https://test.invalid/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Gun-Akisi':'1',cookie,...(auth?{Authorization:auth,'X-Gun-Akisi-Trigger':'cron'}:{})},body:body===undefined?undefined:JSON.stringify(body)}));}
-const first=await request('bootstrap',{});assert.equal(first.status,200);const cookie=first.headers.get('set-cookie').split(';')[0];const firstState=await first.json();assert.equal(firstState.settings.districtId,'12345');
+const first=await request('bootstrap',{});assert.equal(first.status,200);const cookie=first.headers.get('set-cookie').split(';')[0];const firstState=await first.json();assert.equal(firstState.settings.districtId,'9206');assert.equal(firstState.settings.prayerAreaName,'ANKARA');assert.equal(firstState.settings.districtName,'Etimesgut');assert.equal(firstState.prayerError,'');
 const second=await request('bootstrap',{});const other=second.headers.get('set-cookie').split(';')[0];assert.notEqual(other,cookie);assert.equal((await request('state',undefined)).status,401);assert.equal((await request('tick',{},cookie)).status,401);
+// Reproduce the real provider shape: Etimesgut is absent; IDs may be numeric.
+assert.equal(locations.locationKey('  ETIMESGUT  '),locations.locationKey('Etimesgut'));
+assert.equal(locations.locationKey('ŞEREFLİKOÇHİSAR'),locations.locationKey('sereflikochisar'));
+assert.equal((await prayers.defaultLocation()).districtId,'9206');
+const districtList=await(await request('locations?city=506')).json();assert(districtList.find(x=>x.id==='9206').aliases.includes('Etimesgut'));
+const malformed=[null,{SehirID:506,SehirAdi:' ANKARA '},{SehirID:'bad',SehirAdi:'Ignore'},{SehirID:506,SehirAdi:'ANKARA'}];
+assert.deepEqual(prayers.parseLocations(malformed,'city'),[{id:'506',name:'ANKARA'}]);
+const sample={MiladiTarihKisa:'10.9.2026',Imsak:' 05:00 ',Gunes:'06:20',Ogle:'12:50',Ikindi:'16:20',Aksam:'19:10',Yatsi:'20:30'};
+assert.equal(prayers.parsePrayerDays([sample,sample]).length,1);
+assert.throws(()=>prayers.parsePrayerDays([{...sample,MiladiTarihKisa:'31.02.2026'}]));
+assert.throws(()=>prayers.parsePrayerDays([{...sample,MiladiTarihKisa:'09.09.2026'}]));
+assert.throws(()=>prayers.parsePrayerDays([{...sample,Gunes:'04:00'}]));
+const beforeRefresh=prayerRequests;assert.equal((await request('refresh-plan',{},cookie)).status,200);assert.equal(prayerRequests,beforeRefresh+1);
+// A real retry can refresh the cache, while today's validated cache survives an outage.
+prayerOutage=true;assert.equal((await prayers.prayerDays('9206',true))[0].date,'2026-09-10');prayerOutage=false;
+// Existing installs stuck with an empty district heal without clearing their device cookie.
+const oldDevice=sqlite.prepare('SELECT id,settings FROM devices ORDER BY rowid LIMIT 1').get();
+sqlite.prepare('UPDATE devices SET settings=? WHERE id=?').run(JSON.stringify({...JSON.parse(oldDevice.settings),districtId:''}),oldDevice.id);
+const healed=await(await request('state',undefined,cookie)).json();assert.equal(healed.settings.districtId,'9206');assert.equal(healed.prayerError,'');
+console.log('PASS: actual missing-Etimesgut shape, numeric location IDs, existing-install recovery, forced refresh, current-day validation');
 const ecdh=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
 const subscription={endpoint:'https://web.push.apple.com/TEST',keys:{p256dh:push.b64(new Uint8Array(await crypto.subtle.exportKey('raw',ecdh.publicKey))),auth:push.b64(crypto.getRandomValues(new Uint8Array(16)))}};
 assert.throws(()=>push.validateSubscription({...subscription,endpoint:'https://127.0.0.1/private'}));
 const subscribed=await request('subscribe',{subscription},cookie);assert.equal(subscribed.status,200);let state=await subscribed.json();assert(state.events.length>0);assert.equal(state.scheduler.active,false);
+const testNotification=await request('test-push',{},cookie);assert.equal(testNotification.status,200);assert(accepted.length>0);
+assert.equal((await request('test-push',{},cookie)).status,429);
 const oldIds=state.events.filter(x=>x.status==='pending').map(x=>x.id);
-const changed=await request('settings',{revision:state.revision,settings:{districtId:'12346',cityId:'506'}},cookie);assert.equal(changed.status,200);state=await changed.json();assert.equal(state.settings.districtName,'SİNCAN');assert(sqlite.prepare('SELECT COUNT(*) as c FROM events WHERE id IN ('+oldIds.map(()=>'?').join(',')+") AND status='cancelled'").get(...oldIds).c>0);
+const changed=await request('settings',{revision:state.revision,settings:{districtId:'9207',cityId:'506'}},cookie);assert.equal(changed.status,200);state=await changed.json();assert.equal(state.settings.districtName,'AYAŞ');assert(sqlite.prepare('SELECT COUNT(*) as c FROM events WHERE id IN ('+oldIds.map(()=>'?').join(',')+") AND status='cancelled'").get(...oldIds).c>0);
 const stale=await request('settings',{revision:0,settings:{workStart:'19:00'}},cookie);assert.equal(stale.status,409);
 const id=crypto.randomUUID();assert.equal((await request('session/start',{id,kind:'focus'},cookie)).status,200);assert.equal((await request('session/start',{id,kind:'focus'},cookie)).status,200);assert.equal((await request('session/start',{id:crypto.randomUUID(),kind:'walk'},cookie)).status,400);
 now+=7*60000;assert.equal((await request('session/action',{id,action:'pause'},cookie)).status,200);now+=11*60000;

@@ -4,13 +4,14 @@ Namaz vakitleri, yürüyüş / bisiklet, kısa dinlenme, Pomodoro ve günlük ö
 
 ## Çalışan özellikler
 
-- EzanVakti API üzerinden Diyanet kaynaklı günlük veriler. Ankara / Etimesgut otomatik çözümleme, il ve ilçe seçimi. Türkiye saat dilimi (`Europe/Istanbul`), cihazın saati yanlışsa sunucu saat farkını kullanma.
+- EzanVakti API üzerinden Diyanet kaynaklı günlük veriler. Ankara / Etimesgut varsayılan konumu. Etimesgut ayrı listelenmediğinde API’nin ANKARA kaydı kullanılır ve arayüz bunu “Ankara merkez takvimi” olarak açıklar. İl ve ilçe seçimi, Türkçe/ASCII arama ve yeniden yükleme. Türkiye saat dilimi (`Europe/Istanbul`), cihazın saati yanlışsa sunucu saat farkını kullanma.
 - Güneşten 20 dakika önce kalkış, 10 dakika sonra hareket önerisi. Öğle, ikindi, akşam, yatsıdan 5 dakika önce ve vakit girince bildirim planı.
 - Konum / izin / ayar değişikliklerinde eski planın sürümle iptali. Şekerlemeyi atlama ve hafif gün seçenekleri.
 - Hareketin son 5 dakikasında dönüş, bitiş, kahvaltı ve ardından odak önerisi. Yürüyüş ve bisiklet ayrı sürelerle.
 - Kalıcı Pomodoro ve molalar. Sunucu zaman damgaları; ekran kapansa da süre doğru hesaplanır. Duraklatılan zaman toplama eklenmez.
 - Evdeki malzemelere göre kahvaltı seçenekleri. Gerçek oturumlardan günlük özet ve son 7 gün grafiği. Sahte istatistik yok.
 - 20 dakikalık şekerleme öğle namazından sonra, ikindiden önce tamamlanacak şekilde. Kısa uyku gece uykusunun yerine sayılmaz; eksik uyku açıkça gösterilir.
+- Ana sayfada ve Ayarlar’da her zaman görünen test bildirimi düğmesi; izin yoksa kurulum/izin adımını açar.
 - Web Push kayıt, VAPID, RFC 8291 şifreleme, Service Worker, test gönderimi ve cihaz gösterim onayı.
 - D1 kayıtları; rastgele 256 bit HttpOnly cihaz çerezi. Ziyaretçiler birbirinin programına erişemez. Çerez silinirse bu cihazın eski kayıtlarına erişim kaybolur. Farklı PWA kurulumları ayrı kayıt oluşturabilir.
 
@@ -37,6 +38,8 @@ Node 24 ve pnpm. `pnpm install`, `pnpm dev`, `pnpm build`.
 - `pnpm typecheck`: TypeScript denetimi.
 - `pnpm test`: gerçek SQLite üzerinde cihaz izolasyonu, konum değişiminde kuyruk iptali, eşzamanlı ayar sürümü, idempotent oturum başlatma, duraklatma / devam, gece yarısı, izin günü, uyku sınırı, scheduler tekrarında çift gönderim ve bağımsız Web Push deşifre / VAPID doğrulaması. Companion Worker için anahtar denetimi, manuel/otomatik ayrımı, ayar doğrulama, hata iletimi ve bağlantı sayfasının JavaScript denetimi.
 - `pnpm db:generate`: Drizzle migration üretimi. Yayımlanmış migration değiştirilmez.
+
+Etimesgut kaydının bulunmadığı gerçek servis yapısı, sayısal konum kimlikleri, eski kurulumlarda boş ilçe kaydının onarımı, geçersiz/eski tarihlerin reddi ve önbelleği yenileme regresyon testleriyle denetlenir. 10 Eylül 2026 tarihinde canlı ANKARA API yanıtı ayrıca okunup güncel gün ayrıştırması doğrulandı.
 
 Testlerde saat ve namaz verileri açıkça fixture olarak kullanılır; bunlar gerçek günlük veri doğrulaması veya fiziksel iPhone testi değildir. Yeni ilçedeki geçerli veri gelmezse mevcut konum korunur. Vakit servisi yoksa doğrulanmamış saat uydurulmaz.
 
